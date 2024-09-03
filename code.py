@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import norm
 
+# Set the page configuration to wide mode
+st.set_page_config(layout="wide")
+
 # Black-Scholes formula
 def black_scholes(S, K, T, r, sigma, option_type):
     d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
