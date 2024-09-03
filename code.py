@@ -59,14 +59,14 @@ def generate_heatmap_data(func, K, T, r, sigma_range, S_range, steps, option_typ
 
 # Function to plot heatmap
 def plot_heatmap(data, x_labels, y_labels, title, xlabel, ylabel, cmap='RdYlGn'):
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(14, 7))  # Larger figure size
     sns.heatmap(
         data,
         xticklabels=[f"{x * 100:.1f}%" for x in x_labels],  # Convert to percentage
         yticklabels=[f"${y:.1f}" for y in y_labels],        # Format y_labels with dollar sign and one decimal place
         annot=True,
         fmt=".2f",
-        cbar=True,
+        cbar=False,  # Hide the color bar
         linewidths=0.5,
         linecolor='gray',
         cmap=cmap
@@ -78,17 +78,18 @@ def plot_heatmap(data, x_labels, y_labels, title, xlabel, ylabel, cmap='RdYlGn')
     st.pyplot(plt)
 
 # Function to calculate profitability
-def calculate_profitability(option_price, K, spot_prices, volatilities, option_type, amount_paid):
+def calculate_profitability(option_price, K, spot_prices, volatilities, option_type, amount_paid, pricing_model):
     profitability = np.zeros((len(spot_prices), len(volatilities)))
     for i, S in enumerate(spot_prices):
         for j, sigma in enumerate(volatilities):
+            # Compute option price for current spot price and volatility
             if option_type == 'call':
-                intrinsic_value = max(0, S - K)
+                price = black_scholes(S, K, T, r, sigma, 'call') if pricing_model == 'Black-Scholes' else binomial_tree(S, K, T, r, sigma, steps, 'call')
             elif option_type == 'put':
-                intrinsic_value = max(0, K - S)
+                price = black_scholes(S, K, T, r, sigma, 'put') if pricing_model == 'Black-Scholes' else binomial_tree(S, K, T, r, sigma, steps, 'put')
             else:
                 raise ValueError("Invalid option type. Must be 'call' or 'put'.")
-            profitability[i, j] = intrinsic_value - amount_paid
+            profitability[i, j] = price - amount_paid
     return profitability
 
 # Streamlit app
@@ -193,28 +194,49 @@ if call_price is not None and put_price is not None:
         binomial_tree if pricing_model == "Binomial Tree" else black_scholes,
         K, T, r, volatility_range, spot_price_range, steps, "call", pricing_model
     )
-    plot_heatmap(
-        heatmap_data_call,
-        volatilities,
-        spot_prices,
-        "Call Option Price Heatmap",
-        "Volatility (%)",
-        "Spot Price"
-    )
-
+    
     # Heatmap for put options
     heatmap_data_put, spot_prices, volatilities = generate_heatmap_data(
         binomial_tree if pricing_model == "Binomial Tree" else black_scholes,
         K, T, r, volatility_range, spot_price_range, steps, "put", pricing_model
     )
-    plot_heatmap(
-        heatmap_data_put,
-        volatilities,
-        spot_prices,
-        "Put Option Price Heatmap",
-        "Volatility (%)",
-        "Spot Price"
+    
+    # Plot heatmaps side by side
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8))  # Larger figure size and two subplots
+    sns.heatmap(
+        heatmap_data_call,
+        xticklabels=[f"{x * 100:.1f}%" for x in volatilities],  # Convert to percentage
+        yticklabels=[f"${y:.1f}" for y in spot_prices],        # Format y_labels with dollar sign and one decimal place
+        annot=True,
+        fmt=".2f",
+        cbar=False,  # Hide the color bar
+        linewidths=0.5,
+        linecolor='gray',
+        cmap='RdYlGn',
+        ax=axes[0]
     )
+    axes[0].set_xlabel("Volatility (%)")
+    axes[0].set_ylabel("Spot Price")
+    axes[0].set_title("Call Option Price Heatmap")
+
+    sns.heatmap(
+        heatmap_data_put,
+        xticklabels=[f"{x * 100:.1f}%" for x in volatilities],  # Convert to percentage
+        yticklabels=[f"${y:.1f}" for y in spot_prices],        # Format y_labels with dollar sign and one decimal place
+        annot=True,
+        fmt=".2f",
+        cbar=False,  # Hide the color bar
+        linewidths=0.5,
+        linecolor='gray',
+        cmap='RdYlGn',
+        ax=axes[1]
+    )
+    axes[1].set_xlabel("Volatility (%)")
+    axes[1].set_ylabel("Spot Price")
+    axes[1].set_title("Put Option Price Heatmap")
+
+    plt.tight_layout()  # Ensure that everything fits nicely
+    st.pyplot(fig)
 
     # Check profitability
     if st.session_state.check_profitability_clicked:
@@ -222,7 +244,7 @@ if call_price is not None and put_price is not None:
         
         # Profitability heatmap for call options
         if st.session_state.option_type_profit == 'call':
-            profitability_data_call = calculate_profitability(call_price, K, spot_prices, volatilities, "call", st.session_state.amount_paid)
+            profitability_data_call = calculate_profitability(call_price, K, spot_prices, volatilities, "call", st.session_state.amount_paid, pricing_model)
             plot_heatmap(
                 profitability_data_call,
                 volatilities,
@@ -235,7 +257,7 @@ if call_price is not None and put_price is not None:
         
         # Profitability heatmap for put options
         if st.session_state.option_type_profit == 'put':
-            profitability_data_put = calculate_profitability(put_price, K, spot_prices, volatilities, "put", st.session_state.amount_paid)
+            profitability_data_put = calculate_profitability(put_price, K, spot_prices, volatilities, "put", st.session_state.amount_paid, pricing_model)
             plot_heatmap(
                 profitability_data_put,
                 volatilities,
