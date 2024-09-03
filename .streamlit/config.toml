@@ -1,16 +1,11 @@
-[server]
-headless = true
-port = 8501
-enableCORS = false
-
 [theme]
-base = "dark"
+primaryColor = "#FF4B4B"
+# backgroundColor = "#10344b"
+backgroundColor = "#0E1117"
+# secondaryBackgroundColor = "#154360"
+secondaryBackgroundColor = "#262730"
+textColor = "#FAFAFA"
+font = "sans serif"
 
-[browser]
-gatherUsageStats = false
-
-[global]
-enableWebsocketCompression = false
-
-[layout]
-width = "wide"
+[server]
+enableStaticServing = true
