@@ -63,21 +63,22 @@ def plot_heatmap(data, x_labels, y_labels, title, xlabel, ylabel, cmap='RdYlGn')
     sns.heatmap(
         data,
         xticklabels=[f"{x * 100:.1f}%" for x in x_labels],  # Convert to percentage
-        yticklabels=[f"{y:.1f}" for y in y_labels],         # Format y_labels with one decimal place
+        yticklabels=[f"${y:.1f}" for y in y_labels],        # Format y_labels with dollar sign and one decimal place
         annot=True,
         fmt=".2f",
         cbar=True,
         linewidths=0.5,
         linecolor='gray',
-        cmap=cmap  # Use the specified color map
+        cmap=cmap
     )
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
+    plt.tight_layout()  # Ensure that everything fits nicely
     st.pyplot(plt)
 
 # Function to calculate profitability
-def calculate_profitability(option_price, K, spot_prices, volatilities, option_type):
+def calculate_profitability(option_price, K, spot_prices, volatilities, option_type, amount_paid):
     profitability = np.zeros((len(spot_prices), len(volatilities)))
     for i, S in enumerate(spot_prices):
         for j, sigma in enumerate(volatilities):
@@ -87,7 +88,7 @@ def calculate_profitability(option_price, K, spot_prices, volatilities, option_t
                 intrinsic_value = max(0, K - S)
             else:
                 raise ValueError("Invalid option type. Must be 'call' or 'put'.")
-            profitability[i, j] = intrinsic_value - option_price
+            profitability[i, j] = intrinsic_value - amount_paid
     return profitability
 
 # Streamlit app
@@ -103,9 +104,15 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-# Initialize session state for model selection
+# Initialize session state for model selection and profitability check
 if 'pricing_model' not in st.session_state:
     st.session_state.pricing_model = 'Black-Scholes'
+if 'option_type_profit' not in st.session_state:
+    st.session_state.option_type_profit = None
+if 'amount_paid' not in st.session_state:
+    st.session_state.amount_paid = None
+if 'check_profitability_clicked' not in st.session_state:
+    st.session_state.check_profitability_clicked = False
 
 # Input parameters in sidebar
 with st.sidebar:
@@ -114,6 +121,17 @@ with st.sidebar:
     T = st.number_input("Time to Maturity (years)", value=1.0, step=0.01)
     r = st.number_input("Risk-Free Rate (%)", value=5.0, step=0.1) / 100
     sigma = st.number_input("Volatility (%)", value=20.0, step=0.1) / 100
+
+    st.sidebar.header("Profitability Inputs")
+    option_type_profit = st.sidebar.radio("Option Type for Profitability", ("call", "put"))
+    amount_paid = st.sidebar.number_input("Amount Paid for Option", value=0.0, step=0.01)
+    
+    if st.sidebar.button("Check Profitability"):
+        st.session_state.option_type_profit = option_type_profit
+        st.session_state.amount_paid = amount_paid
+        st.session_state.check_profitability_clicked = True
+    else:
+        st.session_state.check_profitability_clicked = False
 
 # Option type and pricing model selection
 st.header("Options")
@@ -126,7 +144,7 @@ with col2:
     else:
         pricing_model = "Binomial Tree"
 with col3:
-    check_profitability = st.button("Check Profitability")
+    st.sidebar.write("The profitability section is updated automatically based on button click.")
 
 # Handle American options with Black-Scholes
 if option_type == "American" and pricing_model == "Black-Scholes":
@@ -199,29 +217,31 @@ if call_price is not None and put_price is not None:
     )
 
     # Check profitability
-    if check_profitability:
+    if st.session_state.check_profitability_clicked:
         st.header("Profitability Heatmaps")
         
         # Profitability heatmap for call options
-        profitability_data_call = calculate_profitability(call_price, K, spot_prices, volatilities, "call")
-        plot_heatmap(
-            profitability_data_call,
-            volatilities,
-            spot_prices,
-            "Call Option Profitability Heatmap",
-            "Volatility (%)",
-            "Spot Price",
-            cmap='RdYlGn'
-        )
-
+        if st.session_state.option_type_profit == 'call':
+            profitability_data_call = calculate_profitability(call_price, K, spot_prices, volatilities, "call", st.session_state.amount_paid)
+            plot_heatmap(
+                profitability_data_call,
+                volatilities,
+                spot_prices,
+                "Call Option Profitability Heatmap",
+                "Volatility (%)",
+                "Spot Price",
+                cmap='RdYlGn'
+            )
+        
         # Profitability heatmap for put options
-        profitability_data_put = calculate_profitability(put_price, K, spot_prices, volatilities, "put")
-        plot_heatmap(
-            profitability_data_put,
-            volatilities,
-            spot_prices,
-            "Put Option Profitability Heatmap",
-            "Volatility (%)",
-            "Spot Price",
-            cmap='RdYlGn'
-        )
+        if st.session_state.option_type_profit == 'put':
+            profitability_data_put = calculate_profitability(put_price, K, spot_prices, volatilities, "put", st.session_state.amount_paid)
+            plot_heatmap(
+                profitability_data_put,
+                volatilities,
+                spot_prices,
+                "Put Option Profitability Heatmap",
+                "Volatility (%)",
+                "Spot Price",
+                cmap='RdYlGn'
+            )
